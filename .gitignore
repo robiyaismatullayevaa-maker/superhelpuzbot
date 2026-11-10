@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ma'lumotlar bazasi
+database/database.db
+
+# Muhit va maxfiy ma'lumotlar
+.env
+*.log
+
+# Muhit papkalari
+venv/
+.venv/
