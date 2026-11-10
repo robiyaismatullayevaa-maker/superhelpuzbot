@@ -3,9 +3,11 @@ SUPER ASSISTANT - Asosiy Ishga Tushirish Fayli (main.py)
 Muallif: Murodilova Robiya (@byrobiye)
 Texnologiyalar: Python 3, aiogram 3, SQLite (aiosqlite)
 """
+import os
 import asyncio
 import logging
 import sys
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -44,12 +46,10 @@ async def fallback_unknown_message_handler(message: Message, state: FSMContext):
     """Barcha boshqa noma'lum buyruq va matnlarni ushlovchi xavfsiz handler"""
     text = (message.text or "").strip().lower()
 
-    # Agar foydalanuvchi /start yozgan bo'lsa darhol start handleriga yo'naltiramiz
     if text.startswith("/start") or text == "start":
         await handle_start(message, state)
         return
 
-    # Holatni tozalaymiz
     await state.clear()
     is_admin = message.from_user.id in ADMIN_IDS
 
@@ -65,6 +65,24 @@ async def fallback_unknown_message_handler(message: Message, state: FSMContext):
     )
 
 
+async def start_web_server():
+    """Render.com bepul Web Service uchun HTTP server (Health Check)"""
+    port = int(os.getenv("PORT", 0))
+    if port > 0:
+        async def ping_handler(request):
+            return web.Response(text="SUPER ASSISTANT is alive and running 24/7! 🤖")
+
+        app = web.Application()
+        app.router.add_get("/", ping_handler)
+        app.router.add_get("/health", ping_handler)
+
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+        print(f"🌐 Render Web Service {port}-portda muvaffaqiyatli ishga tushdi.")
+
+
 async def main():
     """Botni ishga tushiruvchi bosh funksiya"""
     print("=" * 60)
@@ -76,15 +94,15 @@ async def main():
     await init_db()
     print("✅ SQLite ma'lumotlar bazasi muvaffaqiyatli ishga tushirildi.")
 
-    # 2. Bot va Dispatcher yaratish
+    # 2. Render.com uchun web serverni yoqish (agar serverda bo'lsa)
+    await start_web_server()
+
+    # 3. Bot va Dispatcher yaratish
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # 3. Routerlarni to'g'ri tartibda ulash
-    # 1-o'rinda: Start router (har qanday holatda /start ni ushlaydi)
+    # 4. Routerlarni tartib bilan ulash
     dp.include_router(start_router)
-
-    # 2-9 o'rinlarda: Asosiy xizmatlar routerlari
     dp.include_router(ai_router)
     dp.include_router(weather_router)
     dp.include_router(translator_router)
@@ -93,13 +111,11 @@ async def main():
     dp.include_router(reminders_router)
     dp.include_router(currency_router)
     dp.include_router(admin_router)
-
-    # 10-o'rinda: Eng oxirgi Fallback router
     dp.include_router(fallback_router)
 
     print("\n🚀 SUPER ASSISTANT tayyor va xabarlarni kutmoqda! Telegramda /start bosing.\n")
 
-    # 4. Yangi xabarlarni tinglash
+    # 5. Yangi xabarlarni tinglash
     await dp.start_polling(bot)
 
 
